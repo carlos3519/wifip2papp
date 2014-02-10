@@ -26,20 +26,18 @@ public class CameraPreview extends SurfaceView implements Callback {
 
 	@Override
 	public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
-		if(surfaceHolder.getSurface() != null){
-			try{
-				camera.stopPreview();
-			}catch(Exception ex){
-				// ignore: tried to stop a non-existent preview
-			}
-			
-	        // set preview size and make any resize, rotate or
-	        // reformatting changes here
-			
-	        // start preview with new settings
-			if(preview){
+		if( preview && surfaceHolder.getSurface() != null){
+				try {
+					camera.stopPreview();
+				} catch (Exception ex) {
+					// ignore: tried to stop a non-existent preview
+				}
+
+				// set preview size and make any resize, rotate or
+				// reformatting changes here
+
+				// start preview with new settings
 				startPreview(surfaceHolder);
-			}
 		}
 	}
 

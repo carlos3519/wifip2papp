@@ -35,9 +35,14 @@ public class FilePathProvider {
 	        filePath = mediaStorageDir.getPath() + File.separator + "IMG_"+ timeStamp + ".jpg";
 	    } else if(type == MEDIA_TYPE_VIDEO) {
 	    	filePath = mediaStorageDir.getPath() + File.separator +"VID_"+ timeStamp + ".mp4";
-	    } else {
-	        return null;
 	    }
+	   
+	    return filePath;
+	}
+	
+	public File getOutputMediaFile(int type){
+		
+		String filePath = getOutputMediaFilePath(type);
 	    
 	    File mediaFile = new File(filePath);
 	    
@@ -49,7 +54,7 @@ public class FilePathProvider {
 	    	}
 	    }
 
-	    return filePath;
+	    return mediaFile;
 	}
 	
 }

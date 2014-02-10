@@ -44,6 +44,7 @@ public class WifiP2pActivity extends Activity {
 
 	public static final String TAG = "WifiP2pActivity";
 	public static final int PORT = 5678;
+	public static final int SEND_BUFF_SIZE = 1024*10;
 	
 	private IntentFilter intentFilter = null;
 	private WifiP2pManager p2pManager = null;
@@ -104,26 +105,24 @@ public class WifiP2pActivity extends Activity {
 						LocalSocket client = localServerSocket.accept();
 						InputStream is = null;
 						OutputStream os = null;
-						if(client != null && socket != null){
+						if(client != null){
 							try{
-								is = client.getInputStream();
-								os = socket.getOutputStream();
-								byte[] buff = new byte[1024*30];
+								is = client.getInputStream();								
+								byte[] buff = new byte[SEND_BUFF_SIZE];
 								int bc = 0;
 								while((bc=is.read(buff)) >= 0){
-									os.write(buff, 0, bc);
-									os.flush();
+									if(os == null && socket != null){
+										os = socket.getOutputStream();
+									}
+									if(os != null){
+										os.write(buff, 0, bc);
+										os.flush();
+									}
 								}
 							}catch(IOException ex){
 								ex.printStackTrace();
 							}finally{
 								try{
-									if(is != null){
-										is.close();
-									}
-									if(os != null){
-										os.close();
-									}
 									if(socket != null){
 										socket.close();
 									}
@@ -155,6 +154,7 @@ public class WifiP2pActivity extends Activity {
 					serverSocket = new ServerSocket(PORT);
 					while(true){
 						Socket clientSocket = serverSocket.accept();
+						unregisterReceiver(receiver);
 						postMessage("Client connected");
 						LocalSocket localSocket = new LocalSocket();
 						localSocket.connect( new LocalSocketAddress(LOCALSOCKETADDRESS));
@@ -183,20 +183,23 @@ public class WifiP2pActivity extends Activity {
 	
 	@Override
 	protected void onPause() {
-		stopRecording();
 		super.onPause();
+		stopRecording();
+		
 	}
 	
 	@Override
 	protected void onDestroy() {
-		stopRecording();
 		super.onDestroy();
+		stopRecording();
 	}
 	
 	@Override
 	protected void onResume() {
 		super.onResume();
-		registerReceiver(receiver, intentFilter);
+		if(socket == null){
+			registerReceiver(receiver, intentFilter);
+		}
 	}
 	
 	public void onRecordClicked(View view){
@@ -379,7 +382,7 @@ public class WifiP2pActivity extends Activity {
 	}
 	
 	public void requestData(final InetAddress serverAddress){
-		
+		unregisterReceiver(receiver);
 		postMessage("Group owner found");
 		
 		Thread t = new Thread(new Runnable() {
@@ -391,7 +394,9 @@ public class WifiP2pActivity extends Activity {
 					String addr = serverAddress.getHostAddress();
 					socket = new Socket(addr, PORT);
 					postMessage("Connected to group owner");
-					useData(socket.getInputStream(), ParcelFileDescriptor.fromSocket(socket).getFileDescriptor());
+					File file = fpp.getOutputMediaFile(FilePathProvider.MEDIA_TYPE_VIDEO);
+					writeVideo(socket.getInputStream(), file);
+					startPlayback(file);
 		
 				}catch(Throwable ex){
 					ex.printStackTrace();
@@ -403,13 +408,7 @@ public class WifiP2pActivity extends Activity {
 	}
 	
 	
-	public void useData(InputStream is, FileDescriptor fd){
-		String filePath = fpp.getOutputMediaFilePath(FilePathProvider.MEDIA_TYPE_VIDEO);
-		writeVideo(is, filePath);
-		//startPlayback(filePath, fd);
-	}
-	
-	public void writeVideo(final InputStream is, final String filePath){
+	public void writeVideo(final InputStream is, final File file){
 		
 		
 		Thread t = new Thread(new Runnable() {
@@ -418,19 +417,13 @@ public class WifiP2pActivity extends Activity {
 			public void run() {
 				OutputStream os = null;
 				try{
-					os=  new FileOutputStream(new File(filePath), true);
-					byte[] buff = new byte[1024];
+					os=  new FileOutputStream(file, true);
+					byte[] buff = new byte[SEND_BUFF_SIZE];
 					int bc = 0;
-					int t = 0;
-					boolean s = false;
-					while((bc = is.read(buff)) > 0){
-						os.write(buff, 0, bc);
-						os.flush();
-						t += bc;
-						if(t> 1024*10 && !s){
-							postMessage(t+"bytes written to file buffer");
-							startPlayback(filePath, null);
-							s=true;
+					while(socket.isConnected()){
+						if((bc = is.read(buff)) > 0){
+							os.write(buff, 0, bc);
+							os.flush();
 						}
 					}
 					
@@ -453,36 +446,32 @@ public class WifiP2pActivity extends Activity {
 		t.start();
 	}
 	
-	public void startPlayback(final String  filePath, final FileDescriptor fd){
+	public void startPlayback(final File file){
 		Thread t = new Thread(new Runnable() {
 			
 			@Override
 			public void run() {
 				try {
-					Thread.sleep(3000);
 					postMessage("Starting playback");
 					
 					preview.stopPreview();
 					
 					player = getMediaPlayer();
-					player.setAudioStreamType(AudioManager.STREAM_MUSIC);
 					
+					//player.setAudioStreamType(AudioManager.STREAM_MUSIC);
 					//player.setDataSource(getApplicationContext(), Uri.parse("/storage/emulated/0/DCIM/Camera/Video.mp4") );
 					
-					File file = new File(filePath);
-					postMessage("exist:"+file.exists()+" can read:"+file.canRead());
+					while(file.length()<100*SEND_BUFF_SIZE){
+						Thread.sleep(1000);
+					}
 					
-					
+					String filePath = file.getAbsolutePath();
 					player.setDataSource(getApplicationContext(), Uri.parse(filePath) );
-					//player.setDataSource(fd);
-					player.prepare();
-					
 					player.setDisplay(preview.getHolder());
-					//player.prepareAsync();
+					player.prepare();
 					player.start();
 					postMessage("Playing....");
 				} catch (Exception e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 					postMessage("Problem performing playback:"+e.getMessage());
 				}
