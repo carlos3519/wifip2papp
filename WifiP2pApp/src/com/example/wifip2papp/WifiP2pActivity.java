@@ -3,6 +3,7 @@ package com.example.wifip2papp;
 
 import java.io.File;
 import java.io.FileDescriptor;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,6 +34,8 @@ import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IntentFilter;
+import android.content.res.AssetFileDescriptor;
+import android.content.res.AssetManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
@@ -44,7 +47,7 @@ public class WifiP2pActivity extends Activity {
 
 	public static final String TAG = "WifiP2pActivity";
 	public static final int PORT = 5678;
-	public static final int SEND_BUFF_SIZE = 1024*10;
+	public static final int SEND_BUFF_SIZE = 1024;
 	
 	private IntentFilter intentFilter = null;
 	private WifiP2pManager p2pManager = null;
@@ -63,6 +66,8 @@ public class WifiP2pActivity extends Activity {
 	private Socket socket = null;
 	private LocalServerSocket localServerSocket = null;
 	private LocalSocket localSocket = null;
+	private AssetManager am = null;
+	private AssetFileDescriptor afd = null;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -95,6 +100,8 @@ public class WifiP2pActivity extends Activity {
 	    intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
 	    intentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
 		
+	    am = getAssets();
+	    
 		Thread serverThread = new Thread(new Runnable() {
 			
 			@Override
@@ -282,19 +289,17 @@ public class WifiP2pActivity extends Activity {
 		
 		// Step 2: Set sources
 		//recorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
-		recorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-		
-        //recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);                 
-        //recorder.setVideoFrameRate(20);
-        //recorder.setVideoSize(176,144);
-        //recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H263);
-		
+		recorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);           
+
+       
 		// Step 3: Set a CamcorderProfile (requires API Level 8 or higher)
-		//recorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_LOW));
+		//recorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_TIME_LAPSE_LOW));
 		
 		// Step 4: Set output file		
 		recorder.setOutputFile(fd);
 		recorder.setOutputFormat(8);
+        recorder.setVideoFrameRate(20);
+        recorder.setVideoSize(176,144);
 		recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
 		//recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
 		
@@ -382,6 +387,9 @@ public class WifiP2pActivity extends Activity {
 	}
 	
 	public void requestData(final InetAddress serverAddress){
+		if(socket != null){
+			return;
+		}
 		unregisterReceiver(receiver);
 		postMessage("Group owner found");
 		
@@ -417,15 +425,17 @@ public class WifiP2pActivity extends Activity {
 			public void run() {
 				OutputStream os = null;
 				try{
-					os=  new FileOutputStream(file, true);
+					os=  new FileOutputStream(file);
 					byte[] buff = new byte[SEND_BUFF_SIZE];
 					int bc = 0;
+					
 					while(socket.isConnected()){
 						if((bc = is.read(buff)) > 0){
 							os.write(buff, 0, bc);
 							os.flush();
 						}
 					}
+					postMessage("Writing to buff file has finished");
 					
 				}catch(Exception ex){
 					ex.printStackTrace();
@@ -455,21 +465,80 @@ public class WifiP2pActivity extends Activity {
 					postMessage("Starting playback");
 					
 					preview.stopPreview();
-					
 					player = getMediaPlayer();
-					
 					//player.setAudioStreamType(AudioManager.STREAM_MUSIC);
-					//player.setDataSource(getApplicationContext(), Uri.parse("/storage/emulated/0/DCIM/Camera/Video.mp4") );
+					Thread.sleep(5000);
+					FileInputStream is = new FileInputStream(file);
+					String filePath = file.getPath();
+					//AssetFileDescriptor afd = am.openNonAssetFd(filePath);
+					//player.setDataSource(getApplicationContext(), Uri.parse(filePath) );
+					//player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+					FileDescriptor fd = is.getFD();
+					player.setDataSource(fd);
 					
-					while(file.length()<100*SEND_BUFF_SIZE){
-						Thread.sleep(1000);
-					}
 					
-					String filePath = file.getAbsolutePath();
-					player.setDataSource(getApplicationContext(), Uri.parse(filePath) );
 					player.setDisplay(preview.getHolder());
+					player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+						
+						@Override
+						public void onCompletion(final MediaPlayer mp) {
+							// TODO Auto-generated method stub
+							final long currFileLenth = file.length();
+							final int currPos = mp.getCurrentPosition();
+							final int duration = mp.getDuration();
+							final boolean playing = mp.isPlaying();
+							postMessage("MediaPlayer onCompletion " +
+									"{currFileLenth="+currFileLenth+"}" +
+									"{currPos="+currPos+"} " +
+									"{duration="+duration+"} " +
+									"{playing="+playing+"}");
+							(new Thread(){
+								public void run() {
+									if(playing){
+										mp.stop();
+									}
+									
+									startPlayback(currFileLenth, currPos == 0 ? duration : currPos, file);
+									}
+							}).start();
+							
+						}
+					});
+					player.setOnSeekCompleteListener(new MediaPlayer.OnSeekCompleteListener() {
+						
+						@Override
+						public void onSeekComplete(MediaPlayer mp) {
+							// TODO Auto-generated method stub
+							postMessage("MediaPlayer onSeekComplete");
+							
+						}
+					});
+					player.setOnBufferingUpdateListener(new MediaPlayer.OnBufferingUpdateListener() {
+						
+						@Override
+						public void onBufferingUpdate(MediaPlayer mp, int percent) {
+							// TODO Auto-generated method stub
+							postMessage("MediaPlayer onBufferingUpdate:"+percent);
+						}
+					});
+					player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+						
+						@Override
+						public boolean onError(MediaPlayer mp, int what, int extra) {
+							postMessage("MediaPlayer onError what:"+what+" extra:"+extra);
+							return false;
+						}
+					});
+					player.setOnInfoListener(new MediaPlayer.OnInfoListener() {
+						
+						@Override
+						public boolean onInfo(MediaPlayer mp, int what, int extra) {
+							postMessage("MediaPlayer onInfo what:"+what+" extra:"+extra);
+							return false;
+						}
+					});
 					player.prepare();
-					player.start();
+					startPlayback(0, 0, file);
 					postMessage("Playing....");
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -478,6 +547,19 @@ public class WifiP2pActivity extends Activity {
 			}
 		});
 		t.start();
+	}
+	
+	private void startPlayback(long lastLength, int position, File file){
+		try{
+		while((file.length()-lastLength)<100*SEND_BUFF_SIZE){
+			//postMessage("waiting");
+			Thread.sleep(1000);
+		}
+		player.seekTo(position);
+		player.start();
+		}catch(Exception ex){
+			postMessage("Error starting playback:"+ex.getMessage());
+		}
 	}
 	
 	public void postMessage(String msg){

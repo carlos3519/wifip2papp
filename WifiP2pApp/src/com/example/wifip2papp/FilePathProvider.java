@@ -29,7 +29,8 @@ public class FilePathProvider {
 		
 		String filePath = null;
 		
-	    String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+	    //String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+		String timeStamp = System.currentTimeMillis()+"";
 	    
 	    if (type == MEDIA_TYPE_IMAGE){
 	        filePath = mediaStorageDir.getPath() + File.separator + "IMG_"+ timeStamp + ".jpg";
@@ -48,7 +49,8 @@ public class FilePathProvider {
 	    
 	    if(!mediaFile.exists()){
 	    	try{
-	    		mediaFile.createNewFile();
+	    		boolean created = mediaFile.createNewFile();
+	    		Log.d(TAG, "file created:"+created);
 	    	}catch(Exception ex){
 	    		Log.d(TAG, "problem creating file:"+mediaFile+": "+ex.getMessage());
 	    	}

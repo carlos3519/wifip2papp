@@ -57,11 +57,11 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver implements Wi
 		} else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION.equals(action)) {
 			WifiP2pInfo p2pInfo = (WifiP2pInfo) intent.getExtras().get("wifiP2pInfo");
 			NetworkInfo netInfo = (NetworkInfo) intent.getExtras().get("networkInfo");
-			WifiP2pGroup p2pGroup = (WifiP2pGroup) intent.getExtras().get("p2pGroupInfo");
-			Object connDevAddr = intent.getExtras().get("connectedDevIntfAddress");
+			//WifiP2pGroup p2pGroup = (WifiP2pGroup) intent.getExtras().get("p2pGroupInfo");
+			//Object connDevAddr = intent.getExtras().get("connectedDevIntfAddress");
 			
 			
-			Log.d(TAG, "Connection Changed: "+bundleToString(intent.getExtras()));
+			//Log.d(TAG, "Connection Changed: "+bundleToString(intent.getExtras()));
 	
 			if(netInfo.isConnected() && !p2pInfo.isGroupOwner && p2pInfo.groupOwnerAddress != null && goAddress == null){
 				goAddress = p2pInfo.groupOwnerAddress;
