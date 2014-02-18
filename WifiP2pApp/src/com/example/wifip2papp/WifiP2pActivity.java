@@ -60,6 +60,8 @@ public class WifiP2pActivity extends Activity {
 	private boolean recording = false;
 	private Handler handler = null;
 	private FilePathProvider fpp = null;
+	private volatile boolean buffering = false;
+	private volatile boolean receivingData = false;
 	
 	public static final String LOCALSOCKETADDRESS = "WifiP2pActivity";
 	private ServerSocket serverSocket = null;
@@ -433,6 +435,7 @@ public class WifiP2pActivity extends Activity {
 					int bc = 0;
 					
 					while(socket.isConnected()){
+						receivingData = true;
 						if((bc = is.read(buff)) > 0){
 							os.write(buff, 0, bc);
 							os.flush();
@@ -444,6 +447,7 @@ public class WifiP2pActivity extends Activity {
 					ex.printStackTrace();
 					postMessage("Error writing video to file");
 				}finally{
+					receivingData = false;
 					if(os != null){
 						try{
 						os.flush();
@@ -494,15 +498,13 @@ public class WifiP2pActivity extends Activity {
 									"{currPos="+currPos+"} " +
 									"{duration="+duration+"} " +
 									"{playing="+playing+"}");
+							if(!buffering){
 							(new Thread(){
 								public void run() {
-									if(playing){
-										mp.stop();
-									}
-									
-									startPlayback(currFileLenth, currPos == 0 ? duration : currPos, file);
+									startPlayback(currFileLenth, duration, file);
 									}
 							}).start();
+							}
 							
 						}
 					});
@@ -552,8 +554,9 @@ public class WifiP2pActivity extends Activity {
 	}
 	
 	private void startPlayback(long lastLength, int position, File file){
+		buffering = true;
 		try{
-		while((file.length()-lastLength)<100*SEND_BUFF_SIZE){
+		while((file.length()-lastLength)<100*SEND_BUFF_SIZE && receivingData){
 			//postMessage("waiting");
 			Thread.sleep(1000);
 		}
@@ -562,6 +565,7 @@ public class WifiP2pActivity extends Activity {
 		}catch(Exception ex){
 			postMessage("Error starting playback:"+ex.getMessage());
 		}
+		buffering = false;
 	}
 	
 	public void postMessage(String msg){
