@@ -472,7 +472,6 @@ public class WifiP2pActivity extends Activity {
 					//player.setAudioStreamType(AudioManager.STREAM_MUSIC);
 					Thread.sleep(5000);
 					FileInputStream is = new FileInputStream(file);
-					String filePath = file.getPath();
 					//AssetFileDescriptor afd = am.openNonAssetFd(filePath);
 					//player.setDataSource(getApplicationContext(), Uri.parse(filePath) );
 					//player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
