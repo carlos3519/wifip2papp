@@ -73,6 +73,7 @@ public class WifiP2pActivity extends Activity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_wifi_p2p);
+		
 		handler = new Handler(){
 			
 			@Override
@@ -89,6 +90,7 @@ public class WifiP2pActivity extends Activity {
 		camera = getCamera();
 		preview = new CameraPreview(this, camera);
 		previewSpot.addView(preview);
+		
 		launchServer();
 		
 		p2pManager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
@@ -298,8 +300,9 @@ public class WifiP2pActivity extends Activity {
 		// Step 4: Set output file		
 		recorder.setOutputFile(fd);
 		recorder.setOutputFormat(8);
-        recorder.setVideoFrameRate(20);
-        recorder.setVideoSize(176,144);
+		recorder.setVideoEncodingBitRate(90);
+        //recorder.setVideoFrameRate(20);
+        //recorder.setVideoSize(176,144);
 		recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
 		//recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
 		
